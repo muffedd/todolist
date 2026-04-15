@@ -585,6 +585,22 @@
       return 'task-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     }
 
+    function loadDayStartMin() {
+      const raw = localStorage.getItem('timercut_day_start_min');
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) return DEFAULT_DAY_START_MIN;
+      return clampDayStartMin(parsed);
+    }
+
+    function saveDayStartMin() {
+      localStorage.setItem('timercut_day_start_min', String(dayStartMin));
+    }
+
+    function clampDayStartMin(value) {
+      const rounded = Math.round(value / SLOT_STEP_MIN) * SLOT_STEP_MIN;
+      return Math.min(DAY_END_MIN - SLOT_STEP_MIN, Math.max(0, rounded));
+    }
+
     function loadTasks() {
       const raw = localStorage.getItem('timercut_tasks');
       if (!raw) return [];
@@ -1232,18 +1248,3 @@
   </script>
 </body>
 </html>
-    function loadDayStartMin() {
-      const raw = localStorage.getItem('timercut_day_start_min');
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) return DEFAULT_DAY_START_MIN;
-      return clampDayStartMin(parsed);
-    }
-
-    function saveDayStartMin() {
-      localStorage.setItem('timercut_day_start_min', String(dayStartMin));
-    }
-
-    function clampDayStartMin(value) {
-      const rounded = Math.round(value / SLOT_STEP_MIN) * SLOT_STEP_MIN;
-      return Math.min(DAY_END_MIN - SLOT_STEP_MIN, Math.max(0, rounded));
-    }
