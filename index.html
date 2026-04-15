@@ -639,8 +639,27 @@
       return [...tasks].sort((a, b) => a.start - b.start);
     }
 
+    function getFreeWindows() {
+      const windows = [];
+      let cursor = DAY_START_MIN;
+
+      getTaskEntries().forEach((task) => {
+        if (task.start > cursor) {
+          windows.push({ start: cursor, end: task.start });
+        }
+        cursor = Math.max(cursor, task.end);
+      });
+
+      if (cursor < DAY_END_MIN) {
+        windows.push({ start: cursor, end: DAY_END_MIN });
+      }
+
+      return windows;
+    }
+
     function getTimelineSegments() {
       const boundaries = new Set([DAY_START_MIN, DAY_END_MIN]);
+      const freeWindows = getFreeWindows();
 
       for (let minute = DAY_START_MIN; minute <= DAY_END_MIN; minute += 60) {
         boundaries.add(minute);
@@ -671,11 +690,26 @@
             isTaskStart: start === matchingTask.start
           });
         } else {
-          segments.push({ type: 'gap', start, end });
+          const freeWindow = freeWindows.find((window) => start >= window.start && end <= window.end);
+          segments.push({
+            type: 'gap',
+            start,
+            end,
+            windowStart: freeWindow ? freeWindow.start : start,
+            windowEnd: freeWindow ? freeWindow.end : end
+          });
         }
       }
 
       return segments;
+    }
+
+    function getSelectableStartTimes(windowStart, windowEnd) {
+      const options = [];
+      for (let minute = windowStart; minute <= windowEnd - SLOT_STEP_MIN; minute += SLOT_STEP_MIN) {
+        options.push(minute);
+      }
+      return options;
     }
 
     function getSelectableEndTimes(start, maxEnd) {
@@ -795,17 +829,40 @@
             priSel.appendChild(option);
           });
 
-          const endSel = document.createElement('select');
-          endSel.className = 'editor-select';
-          getSelectableEndTimes(rowStart, rowEnd).forEach((minute) => {
+          const startSel = document.createElement('select');
+          startSel.className = 'editor-select';
+          getSelectableStartTimes(segment.windowStart, segment.windowEnd).forEach((minute) => {
             const option = document.createElement('option');
             option.value = minute;
-            option.textContent = 'until ' + formatTime(minute);
-            endSel.appendChild(option);
+            option.textContent = 'from ' + formatTime(minute);
+            if (minute === rowStart) option.selected = true;
+            startSel.appendChild(option);
           });
+
+          const endSel = document.createElement('select');
+          endSel.className = 'editor-select';
+
+          function syncEndOptions(preferredEnd) {
+            const selectedStart = parseInt(startSel.value, 10);
+            const endOptions = getSelectableEndTimes(selectedStart, segment.windowEnd);
+            endSel.innerHTML = '';
+
+            endOptions.forEach((minute) => {
+              const option = document.createElement('option');
+              option.value = minute;
+              option.textContent = 'until ' + formatTime(minute);
+              endSel.appendChild(option);
+            });
+
+            const safePreferred = endOptions.includes(preferredEnd) ? preferredEnd : Math.min(segment.windowEnd, Math.max(selectedStart + SLOT_STEP_MIN, rowEnd));
+            endSel.value = String(safePreferred);
+          }
+
+          syncEndOptions(rowEnd);
 
           editor.appendChild(input);
           editor.appendChild(priSel);
+          editor.appendChild(startSel);
           editor.appendChild(endSel);
           content.appendChild(editor);
 
@@ -818,9 +875,9 @@
 
           const handleBlur = () => {
             setTimeout(() => {
-              if (activeEditor === row && document.activeElement !== input && document.activeElement !== priSel && document.activeElement !== endSel) {
+              if (activeEditor === row && document.activeElement !== input && document.activeElement !== priSel && document.activeElement !== startSel && document.activeElement !== endSel) {
                 if (input.value.trim()) {
-                  commitTask(rowStart, input.value.trim(), parseInt(endSel.value, 10), priSel.value);
+                  commitTask(parseInt(startSel.value, 10), input.value.trim(), parseInt(endSel.value, 10), priSel.value);
                 } else {
                   closeEditor(row);
                 }
@@ -830,15 +887,20 @@
 
           input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-              commitTask(rowStart, input.value.trim(), parseInt(endSel.value, 10), priSel.value);
+              commitTask(parseInt(startSel.value, 10), input.value.trim(), parseInt(endSel.value, 10), priSel.value);
             }
             if (e.key === 'Escape') {
               closeEditor(row);
             }
           });
 
+          startSel.addEventListener('change', () => {
+            syncEndOptions(parseInt(endSel.value, 10));
+          });
+
           input.addEventListener('blur', handleBlur);
           priSel.addEventListener('blur', handleBlur);
+          startSel.addEventListener('blur', handleBlur);
           endSel.addEventListener('blur', handleBlur);
         }
 
