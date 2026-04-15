@@ -575,12 +575,6 @@
       mustnotmiss: { label: 'must not miss', icon: '!' }
     };
 
-    let dayStartMin = loadDayStartMin();
-    let tasks = loadTasks();
-    let activeEditor = null;
-    let notifIntervals = {};
-    let stopCounts = {};
-
     function createTaskId() {
       return 'task-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     }
@@ -600,6 +594,12 @@
       const rounded = Math.round(value / SLOT_STEP_MIN) * SLOT_STEP_MIN;
       return Math.min(DAY_END_MIN - SLOT_STEP_MIN, Math.max(0, rounded));
     }
+
+    let dayStartMin = loadDayStartMin();
+    let tasks = loadTasks();
+    let activeEditor = null;
+    let notifIntervals = {};
+    let stopCounts = {};
 
     function loadTasks() {
       const raw = localStorage.getItem('timercut_tasks');
