@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>timercut</title>
+  <meta name="description" content="A minimal daily planner. Click a time slot, type a task, get notified.">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #fff;
+      color: #111;
+      min-height: 100vh;
+      padding: 48px 0 80px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .planner-panel {
+      min-width: 0;
+    }
+
+    .today-panel {
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 20px 18px;
+      position: sticky;
+      top: 24px;
+      background: #fff;
+    }
+
+    .today-panel h2 {
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #999;
+      margin-bottom: 16px;
+    }
+
+    .today-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .today-item {
+      border: 1px solid #ececec;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .today-item-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .today-item .task-pill {
+      max-width: 100%;
+    }
+
+    .today-time {
+      font-size: 11px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .today-empty {
+      font-size: 13px;
+      color: #999;
+      line-height: 1.5;
+    }
+
+    .header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #111;
+    }
+
+    .header .date {
+      font-size: 13px;
+      color: #999;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.high { background: #e74c3c; }
+    .legend-dot.medium { background: #3498db; }
+    .legend-dot.low { background: #2ecc71; }
+    .legend-dot.mustnotmiss { background: #f1c40f; }
+
+    .schedule {
+      width: 100%;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .hour-row {
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid #e0e0e0;
+      min-height: 48px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .hour-row:hover {
+      background: #fafafa;
+    }
+
+    .hour-row.has-task {
+      cursor: default;
+    }
+
+    .hour-row.task-start {
+      border-bottom-color: transparent;
+    }
+
+    .hour-row.task-mid {
+      cursor: default;
+    }
+
+    .hour-label {
+      width: 92px;
+      min-width: 92px;
+      padding: 12px 0;
+      font-size: 13px;
+      color: #999;
+      text-align: right;
+      padding-right: 20px;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .hour-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      position: relative;
+      border-left: 1px solid #e0e0e0;
+      min-width: 0;
+    }
+
+    .hour-row.task-start .hour-content {
+      border-left: 3px solid #111;
+    }
+
+    .hour-row.task-mid .hour-content {
+      border-left: 3px solid #111;
+    }
+
+    .hour-row.priority-high .hour-content { border-left-color: #e74c3c; }
+    .hour-row.priority-medium .hour-content { border-left-color: #3498db; }
+    .hour-row.priority-low .hour-content { border-left-color: #2ecc71; }
+    .hour-row.priority-mustnotmiss .hour-content { border-left-color: #f1c40f; }
+
+    .plus-icon {
+      font-size: 18px;
+      color: #ccc;
+      transition: color 0.15s;
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+
+    .hour-row:hover .plus-icon {
+      color: #999;
+    }
+
+    .task-editor {
+      display: none;
+      width: 100%;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .task-editor.active {
+      display: flex;
+    }
+
+    .task-editor input[type="text"] {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      background: transparent;
+      color: #111;
+      padding: 4px 0;
+      min-width: 0;
+    }
+
+    .task-editor input[type="text"]::placeholder {
+      color: #bbb;
+    }
+
+    .editor-select {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #777;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      padding: 3px 6px;
+      background: #fff;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .editor-select:focus {
+      border-color: #999;
+    }
+
+    .task-display {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .task-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 400;
+      color: #fff;
+      white-space: nowrap;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 1;
+    }
+
+    .task-pill.high {
+      background: #e74c3c;
+    }
+
+    .task-pill.medium {
+      background: #3498db;
+    }
+
+    .task-pill.low {
+      background: #2ecc71;
+    }
+
+    .task-pill.mustnotmiss {
+      background: #f1c40f;
+      color: #111;
+    }
+
+    .task-pill-icon {
+      font-size: 10px;
+      opacity: 0.75;
+      flex-shrink: 0;
+    }
+
+    .task-duration-badge {
+      font-size: 11px;
+      color: #999;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .task-delete {
+      font-size: 16px;
+      color: transparent;
+      cursor: pointer;
+      padding: 2px 6px;
+      transition: color 0.15s;
+      background: none;
+      border: none;
+      font-family: Arial, sans-serif;
+      flex-shrink: 0;
+    }
+
+    .hour-row:hover .task-delete {
+      color: #ccc;
+    }
+
+    .task-delete:hover {
+      color: #f44 !important;
+    }
+
+    .task-continuation {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .notif-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #111;
+      color: #fff;
+      padding: 14px 24px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-size: 13px;
+      z-index: 100;
+      animation: slideUp 0.25s ease;
+    }
+
+    .notif-bar.visible {
+      display: flex;
+    }
+
+    .notif-bar .notif-text {
+      flex: 1;
+      text-align: center;
+    }
+
+    .notif-bar .stop-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      padding: 6px 16px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: border-color 0.15s, background 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .notif-bar .stop-btn:hover {
+      border-color: rgba(255,255,255,0.6);
+      background: rgba(255,255,255,0.08);
+    }
+
+    .stop-count {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .hour-row.current-hour {
+      background: #f8f8f8;
+    }
+
+    .hour-row.current-hour .hour-label {
+      color: #111;
+      font-weight: 700;
+    }
+
+    .perm-banner {
+      text-align: center;
+      padding: 12px;
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 20px;
+      cursor: pointer;
+      border: 1px dashed #ddd;
+      border-radius: 4px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .perm-banner:hover {
+      border-color: #bbb;
+      color: #666;
+    }
+
+    .perm-banner.granted {
+      display: none;
+    }
+
+    .clear-all {
+      display: inline-block;
+      margin-top: 24px;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #ccc;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 8px 0;
+      transition: color 0.15s;
+    }
+
+    .clear-all:hover {
+      color: #e74c3c;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .today-panel {
+        position: static;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .task-display,
+      .task-editor {
+        flex-wrap: wrap;
+      }
+
+      .hour-label {
+        width: 78px;
+        min-width: 78px;
+        padding-right: 14px;
+      }
+
+      .task-pill {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>timercut</h1>
+      <span class="date" id="dateDisplay"></span>
+    </div>
+
+    <div class="perm-banner" id="permBanner" onclick="requestNotifPermission()">
+      click to enable notifications
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot high"></span> high</div>
+      <div class="legend-item"><span class="legend-dot medium"></span> medium</div>
+      <div class="legend-item"><span class="legend-dot low"></span> low</div>
+      <div class="legend-item"><span class="legend-dot mustnotmiss"></span> must not miss</div>
+    </div>
+
+    <div class="layout">
+      <div class="planner-panel">
+        <div class="schedule" id="schedule"></div>
+        <button class="clear-all" id="clearAll" onclick="clearAllTasks()">clear day</button>
+      </div>
+
+      <aside class="today-panel">
+        <h2>today's tasks</h2>
+        <div class="today-list" id="todayList"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="notif-bar" id="notifBar">
+    <span class="notif-text" id="notifText"></span>
+    <button class="stop-btn" id="stopBtn" onclick="handleStop()">stop</button>
+    <span class="stop-count" id="stopCount"></span>
+  </div>
+
+  <script>
+    const DAY_START_MIN = 5 * 60;
+    const DAY_END_MIN = 24 * 60;
+    const SLOT_STEP_MIN = 5;
+    const NOTIFS_PER_BURST = 5;
+    const BURST_INTERVAL_MS = 60000;
+    const STOPS_REQUIRED = 5;
+
+    const PRIORITIES = {
+      high: { label: 'high', icon: '^' },
+      medium: { label: 'medium', icon: 'o' },
+      low: { label: 'low', icon: 'v' },
+      mustnotmiss: { label: 'must not miss', icon: '!' }
+    };
+
+    let tasks = loadTasks();
+    let activeEditor = null;
+    let notifIntervals = {};
+    let stopCounts = {};
+
+    function createTaskId() {
+      return 'task-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function loadTasks() {
+      const raw = localStorage.getItem('timercut_tasks');
+      if (!raw) return [];
+
+      try {
+        const parsed = JSON.parse(raw);
+
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((task) => ({
+              id: task.id || createTaskId(),
+              name: task.name || '',
+              start: Number(task.start),
+              end: Number(task.end),
+              priority: task.priority || 'medium'
+            }))
+            .filter(isValidTask)
+            .sort((a, b) => a.start - b.start);
+        }
+
+        if (parsed && typeof parsed === 'object') {
+          return Object.entries(parsed)
+            .map(([hourKey, task]) => {
+              const start = Number(hourKey) * 60;
+              const durationHours = parseInt(task.duration, 10) || 1;
+              return {
+                id: createTaskId(),
+                name: task.name || '',
+                start,
+                end: Math.min(start + durationHours * 60, DAY_END_MIN),
+                priority: task.priority || 'medium'
+              };
+            })
+            .filter(isValidTask)
+            .sort((a, b) => a.start - b.start);
+        }
+      } catch (error) {
+        return [];
+      }
+
+      return [];
+    }
+
+    function isValidTask(task) {
+      return Boolean(
+        task &&
+        task.name &&
+        Number.isFinite(task.start) &&
+        Number.isFinite(task.end) &&
+        task.start >= DAY_START_MIN &&
+        task.end <= DAY_END_MIN &&
+        task.end > task.start
+      );
+    }
+
+    function saveTasks() {
+      localStorage.setItem('timercut_tasks', JSON.stringify(tasks));
+    }
+
+    function getToday() {
+      const d = new Date();
+      const opts = { weekday: 'long', month: 'long', day: 'numeric' };
+      return d.toLocaleDateString('en-US', opts).toLowerCase();
+    }
+
+    function formatTime(totalMinutes) {
+      const hour24 = Math.floor(totalMinutes / 60) % 24;
+      const mins = totalMinutes % 60;
+      const suffix = hour24 >= 12 ? 'pm' : 'am';
+      const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+      return mins === 0
+        ? hour12 + ' ' + suffix
+        : hour12 + ':' + String(mins).padStart(2, '0') + ' ' + suffix;
+    }
+
+    function getDurationLabel(start, end) {
+      const totalMinutes = end - start;
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      const parts = [];
+
+      if (hours) parts.push(hours === 1 ? '1 hr' : hours + ' hrs');
+      if (minutes) parts.push(minutes + ' min');
+
+      return parts.join(' ') || '0 min';
+    }
+
+    function getTimeRangeLabel(start, end) {
+      return formatTime(start) + ' - ' + formatTime(end);
+    }
+
+    function getTaskEntries() {
+      return [...tasks].sort((a, b) => a.start - b.start);
+    }
+
+    function getTimelineSegments() {
+      const boundaries = new Set([DAY_START_MIN, DAY_END_MIN]);
+
+      for (let minute = DAY_START_MIN; minute <= DAY_END_MIN; minute += 60) {
+        boundaries.add(minute);
+      }
+
+      getTaskEntries().forEach((task) => {
+        boundaries.add(task.start);
+        boundaries.add(task.end);
+      });
+
+      const sorted = Array.from(boundaries)
+        .filter((minute) => minute >= DAY_START_MIN && minute <= DAY_END_MIN)
+        .sort((a, b) => a - b);
+
+      const segments = [];
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const start = sorted[i];
+        const end = sorted[i + 1];
+        if (end <= start) continue;
+
+        const matchingTask = getTaskEntries().find((task) => start >= task.start && end <= task.end);
+        if (matchingTask) {
+          segments.push({
+            type: 'task',
+            ...matchingTask,
+            segmentStart: start,
+            segmentEnd: end,
+            isTaskStart: start === matchingTask.start
+          });
+        } else {
+          segments.push({ type: 'gap', start, end });
+        }
+      }
+
+      return segments;
+    }
+
+    function getSelectableEndTimes(start, maxEnd) {
+      const options = [];
+
+      for (let minute = start + SLOT_STEP_MIN; minute <= maxEnd; minute += SLOT_STEP_MIN) {
+        options.push(minute);
+      }
+
+      if (!options.length || options[options.length - 1] !== maxEnd) {
+        options.push(maxEnd);
+      }
+
+      return options;
+    }
+
+    function findConflictingTask(start, end, ignoreId) {
+      return getTaskEntries().find((task) => {
+        if (task.id === ignoreId) return false;
+        return start < task.end && end > task.start;
+      }) || null;
+    }
+
+    function buildSchedule() {
+      const container = document.getElementById('schedule');
+      container.innerHTML = '';
+
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      getTimelineSegments().forEach((segment) => {
+        const row = document.createElement('div');
+        row.className = 'hour-row';
+
+        const rowStart = segment.type === 'task' ? segment.segmentStart : segment.start;
+        const rowEnd = segment.type === 'task' ? segment.segmentEnd : segment.end;
+
+        if (nowMinutes >= rowStart && nowMinutes < rowEnd) {
+          row.classList.add('current-hour');
+        }
+
+        const label = document.createElement('div');
+        label.className = 'hour-label';
+        label.textContent = formatTime(rowStart);
+        row.appendChild(label);
+
+        const content = document.createElement('div');
+        content.className = 'hour-content';
+
+        if (segment.type === 'task') {
+          const pri = segment.priority || 'medium';
+          row.classList.add('has-task', segment.isTaskStart ? 'task-start' : 'task-mid', 'priority-' + pri);
+
+          const display = document.createElement('div');
+          display.className = 'task-display';
+
+          const badge = document.createElement('span');
+          badge.className = 'task-duration-badge';
+          badge.textContent = getTimeRangeLabel(rowStart, rowEnd);
+
+          if (segment.isTaskStart) {
+            const pill = document.createElement('span');
+            pill.className = 'task-pill ' + pri;
+
+            const icon = document.createElement('span');
+            icon.className = 'task-pill-icon';
+            icon.textContent = PRIORITIES[pri] ? PRIORITIES[pri].icon : '';
+
+            pill.appendChild(icon);
+            pill.appendChild(document.createTextNode(segment.name));
+            display.appendChild(pill);
+          } else {
+            const continuation = document.createElement('span');
+            continuation.className = 'task-continuation';
+            continuation.textContent = 'continues';
+            display.appendChild(continuation);
+          }
+
+          display.appendChild(badge);
+
+          if (segment.isTaskStart) {
+            const del = document.createElement('button');
+            del.className = 'task-delete';
+            del.textContent = 'x';
+            del.onclick = (e) => {
+              e.stopPropagation();
+              deleteTask(segment.id);
+            };
+            display.appendChild(del);
+          }
+
+          content.appendChild(display);
+        } else {
+          const plus = document.createElement('span');
+          plus.className = 'plus-icon';
+          plus.textContent = '+';
+          content.appendChild(plus);
+
+          const range = document.createElement('span');
+          range.className = 'task-duration-badge gap-range';
+          range.textContent = getTimeRangeLabel(rowStart, rowEnd);
+          content.appendChild(range);
+
+          const editor = document.createElement('div');
+          editor.className = 'task-editor';
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.placeholder = 'type a task...';
+
+          const priSel = document.createElement('select');
+          priSel.className = 'editor-select';
+          Object.entries(PRIORITIES).forEach(([value, data]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = data.label;
+            priSel.appendChild(option);
+          });
+
+          const endSel = document.createElement('select');
+          endSel.className = 'editor-select';
+          getSelectableEndTimes(rowStart, rowEnd).forEach((minute) => {
+            const option = document.createElement('option');
+            option.value = minute;
+            option.textContent = 'until ' + formatTime(minute);
+            endSel.appendChild(option);
+          });
+
+          editor.appendChild(input);
+          editor.appendChild(priSel);
+          editor.appendChild(endSel);
+          content.appendChild(editor);
+
+          row.addEventListener('click', () => {
+            if (activeEditor === row) return;
+            openEditor(row);
+          });
+
+          editor.addEventListener('click', (e) => e.stopPropagation());
+
+          const handleBlur = () => {
+            setTimeout(() => {
+              if (activeEditor === row && document.activeElement !== input && document.activeElement !== priSel && document.activeElement !== endSel) {
+                if (input.value.trim()) {
+                  commitTask(rowStart, input.value.trim(), parseInt(endSel.value, 10), priSel.value);
+                } else {
+                  closeEditor(row);
+                }
+              }
+            }, 200);
+          };
+
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              commitTask(rowStart, input.value.trim(), parseInt(endSel.value, 10), priSel.value);
+            }
+            if (e.key === 'Escape') {
+              closeEditor(row);
+            }
+          });
+
+          input.addEventListener('blur', handleBlur);
+          priSel.addEventListener('blur', handleBlur);
+          endSel.addEventListener('blur', handleBlur);
+        }
+
+        row.appendChild(content);
+        container.appendChild(row);
+      });
+
+      renderTodayTasks();
+    }
+
+    function renderTodayTasks() {
+      const list = document.getElementById('todayList');
+      list.innerHTML = '';
+
+      const entries = getTaskEntries();
+      if (!entries.length) {
+        const empty = document.createElement('div');
+        empty.className = 'today-empty';
+        empty.textContent = 'No tasks yet. Add a task on the left to plan your day.';
+        list.appendChild(empty);
+        return;
+      }
+
+      entries.forEach((task) => {
+        const item = document.createElement('div');
+        item.className = 'today-item';
+
+        const main = document.createElement('div');
+        main.className = 'today-item-main';
+
+        const pill = document.createElement('span');
+        pill.className = 'task-pill ' + task.priority;
+
+        const icon = document.createElement('span');
+        icon.className = 'task-pill-icon';
+        icon.textContent = PRIORITIES[task.priority] ? PRIORITIES[task.priority].icon : '';
+
+        pill.appendChild(icon);
+        pill.appendChild(document.createTextNode(task.name));
+
+        const meta = document.createElement('span');
+        meta.className = 'task-duration-badge';
+        meta.textContent = getDurationLabel(task.start, task.end);
+
+        const time = document.createElement('span');
+        time.className = 'today-time';
+        time.textContent = getTimeRangeLabel(task.start, task.end);
+
+        main.appendChild(pill);
+        main.appendChild(meta);
+        item.appendChild(main);
+        item.appendChild(time);
+        list.appendChild(item);
+      });
+    }
+
+    function openEditor(row) {
+      if (activeEditor && activeEditor !== row) {
+        closeEditor(activeEditor);
+      }
+
+      const plus = row.querySelector('.plus-icon');
+      const range = row.querySelector('.gap-range');
+      const editor = row.querySelector('.task-editor');
+
+      if (plus) plus.style.display = 'none';
+      if (range) range.style.display = 'none';
+
+      if (editor) {
+        editor.classList.add('active');
+        const input = editor.querySelector('input');
+        if (input) input.focus();
+      }
+
+      activeEditor = row;
+    }
+
+    function closeEditor(row) {
+      const plus = row.querySelector('.plus-icon');
+      const range = row.querySelector('.gap-range');
+      const editor = row.querySelector('.task-editor');
+
+      if (plus) plus.style.display = '';
+      if (range) range.style.display = '';
+
+      if (editor) {
+        editor.classList.remove('active');
+        const input = editor.querySelector('input');
+        if (input) input.value = '';
+      }
+
+      if (activeEditor === row) activeEditor = null;
+    }
+
+    function commitTask(start, name, end, priority) {
+      if (!name || !Number.isFinite(end) || end <= start) return;
+
+      const conflictingTask = findConflictingTask(start, end);
+      if (conflictingTask) {
+        alert('This time overlaps with "' + conflictingTask.name + '" at ' + getTimeRangeLabel(conflictingTask.start, conflictingTask.end) + '.');
+        buildSchedule();
+        return;
+      }
+
+      const task = {
+        id: createTaskId(),
+        name,
+        start,
+        end,
+        priority: priority || 'medium'
+      };
+
+      tasks.push(task);
+      tasks = getTaskEntries();
+      saveTasks();
+      buildSchedule();
+      scheduleNotification(task);
+    }
+
+    function deleteTask(taskId) {
+      cancelNotification(taskId);
+      tasks = tasks.filter((task) => task.id !== taskId);
+      saveTasks();
+      buildSchedule();
+    }
+
+    function clearAllTasks() {
+      if (!tasks.length) return;
+
+      Object.keys(notifIntervals).forEach((key) => cancelNotification(key));
+      tasks = [];
+      saveTasks();
+      buildSchedule();
+    }
+
+    function requestNotifPermission() {
+      if (!('Notification' in window)) {
+        document.getElementById('permBanner').textContent = 'notifications not supported in this browser';
+        return;
+      }
+
+      Notification.requestPermission().then((perm) => {
+        if (perm === 'granted') {
+          document.getElementById('permBanner').classList.add('granted');
+        } else {
+          document.getElementById('permBanner').textContent = 'notifications denied - click to retry';
+        }
+      });
+    }
+
+    function scheduleNotification(task) {
+      const key = task.id;
+      cancelNotification(key);
+
+      const checkId = setInterval(() => {
+        const now = new Date();
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        if (nowMinutes === task.start) {
+          clearInterval(checkId);
+          startNotifBurst(key, task.name);
+        }
+      }, 15000);
+
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      if (nowMinutes === task.start) {
+        clearInterval(checkId);
+        startNotifBurst(key, task.name);
+      } else {
+        notifIntervals[key] = checkId;
+      }
+    }
+
+    function startNotifBurst(key, taskName) {
+      stopCounts[key] = 0;
+      showNotifBar(key, taskName);
+      fireBurst(key, taskName);
+
+      notifIntervals[key] = setInterval(() => {
+        fireBurst(key, taskName);
+      }, BURST_INTERVAL_MS);
+    }
+
+    function fireBurst(key, taskName) {
+      const gap = BURST_INTERVAL_MS / NOTIFS_PER_BURST;
+      for (let i = 0; i < NOTIFS_PER_BURST; i++) {
+        setTimeout(() => {
+          if (notifIntervals[key] === undefined && i > 0) return;
+          if (Notification.permission === 'granted') {
+            try {
+              new Notification('timercut', {
+                body: taskName,
+                tag: key + '-' + i,
+                requireInteraction: true
+              });
+            } catch (error) {
+            }
+          }
+        }, gap * i);
+      }
+    }
+
+    function showNotifBar(key, taskName) {
+      const bar = document.getElementById('notifBar');
+      const text = document.getElementById('notifText');
+      const countEl = document.getElementById('stopCount');
+
+      bar.dataset.key = key;
+      text.textContent = taskName;
+      countEl.textContent = '0 / ' + STOPS_REQUIRED;
+      bar.classList.add('visible');
+    }
+
+    function handleStop() {
+      const bar = document.getElementById('notifBar');
+      const key = bar.dataset.key;
+      const countEl = document.getElementById('stopCount');
+
+      if (!key) return;
+
+      stopCounts[key] = (stopCounts[key] || 0) + 1;
+      countEl.textContent = stopCounts[key] + ' / ' + STOPS_REQUIRED;
+
+      const btn = document.getElementById('stopBtn');
+      btn.style.borderColor = 'rgba(255,255,255,0.8)';
+      setTimeout(() => {
+        btn.style.borderColor = '';
+      }, 200);
+
+      if (stopCounts[key] >= STOPS_REQUIRED) {
+        cancelNotification(key);
+        bar.classList.remove('visible');
+        delete stopCounts[key];
+      }
+    }
+
+    function cancelNotification(key) {
+      if (notifIntervals[key] !== undefined) {
+        clearInterval(notifIntervals[key]);
+        delete notifIntervals[key];
+      }
+    }
+
+    document.getElementById('dateDisplay').textContent = getToday();
+    buildSchedule();
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      document.getElementById('permBanner').classList.add('granted');
+    }
+
+    getTaskEntries().forEach((task) => scheduleNotification(task));
+
+    setInterval(() => {
+      buildSchedule();
+    }, 60000);
+  </script>
+</body>
+</html>
